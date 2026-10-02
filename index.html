@@ -1,0 +1,870 @@
+<!DOCTYPE html>
+<html lang="en" id="html-root">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>TAP &amp; JUMP — VK Games Edition</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,600;0,700;0,800;1,400&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <link rel="stylesheet" href="style.css?v=20261002_IAP">
+    <!-- Localization (must load before game scripts) -->
+    <script src="locales.js?v=20261002_IAP"></script>
+    <!-- VK Bridge SDK -->
+    <script src="https://unpkg.com/@vkontakte/vk-bridge/dist/browser.min.js"></script>
+</head>
+<body>
+    <!-- Desktop Ambient Container for PC Widescreen -->
+    <div id="desktop-wrapper" class="desktop-wrapper">
+        <!-- Left PC Technical Sidebar -->
+        <aside class="desktop-flank flank-left" aria-label="Altitude Ladder">
+            <div class="flank-card">
+                <div class="flank-tag" data-i18n="flank_tag_left">[ SECTOR // TEST-01 ]</div>
+                <div class="flank-title" data-i18n="flank_title_left">JUMP RANGE</div>
+                <div class="flank-stat-row">
+                    <span class="flank-label" data-i18n="flank_status_label">STATUS:</span>
+                    <span class="flank-value val-online" data-i18n="flank_status_val">READY TO LAUNCH</span>
+                </div>
+                <div class="flank-scale" id="desktop-altitude-ladder">
+                    <div class="scale-mark active" data-alt="0"><span class="scale-dot"></span><span class="scale-txt" data-i18n="alt_0">0m // START</span></div>
+                    <div class="scale-mark" data-alt="1000"><span class="scale-dot"></span><span class="scale-txt" data-i18n="alt_1000">1 000m // MESO</span></div>
+                    <div class="scale-mark" data-alt="3000"><span class="scale-dot"></span><span class="scale-txt" data-i18n="alt_3000">3 000m // POCKET</span></div>
+                    <div class="scale-mark" data-alt="10000"><span class="scale-dot"></span><span class="scale-txt" data-i18n="alt_10000">10 000m // ORBIT</span></div>
+                    <div class="scale-mark" data-alt="25000"><span class="scale-dot"></span><span class="scale-txt" data-i18n="alt_25000">25 000m // EXO</span></div>
+                    <div class="scale-mark" data-alt="50000"><span class="scale-dot"></span><span class="scale-txt" data-i18n="alt_50000">50 000m // ASTEROIDS</span></div>
+                    <div class="scale-mark" data-alt="100000"><span class="scale-dot"></span><span class="scale-txt" data-i18n="alt_100000">100 000m // ETHER</span></div>
+                    <div class="scale-mark" data-alt="250000"><span class="scale-dot"></span><span class="scale-txt" data-i18n="alt_250000">250 000m+ // VACUUM</span></div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Centered Game Terminal -->
+        <div id="game-frame" class="e-ink-device">
+            <!-- WHO STUDIOS E-INK SPLASH SCREEN (1.5s LOADER) -->
+            <div id="splash-screen" class="splash-screen">
+                <div class="splash-card">
+                    <!-- Corner Crosshairs -->
+                    <div class="splash-corner tl">+</div>
+                    <div class="splash-corner tr">+</div>
+                    <div class="splash-corner bl">+</div>
+                    <div class="splash-corner br">+</div>
+
+                    <div class="splash-header-tag">[ WHO STUDIOS // DEV-01 ]</div>
+
+                    <div class="splash-title">
+                        <span class="splash-title-line">TAP &amp;</span>
+                        <span class="splash-title-line">JUMP</span>
+                    </div>
+
+                    <div class="splash-subtitle" data-i18n="splash_subtitle">// HIGH-ALTITUDE JUMP RANGE //</div>
+
+                    <div class="splash-progress-wrap">
+                        <div class="splash-progress-track">
+                            <div id="splash-progress-bar" class="splash-progress-bar"></div>
+                        </div>
+                        <div class="splash-progress-info">
+                            <span id="splash-status" class="splash-status" data-i18n="splash_loading">&gt; LOADING CORE...</span>
+                            <span id="splash-pct" class="splash-pct">0%</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Failsafe: Ensures splash screen never hangs -->
+            <script>
+                (function() {
+                    function dismissSplash() {
+                        var s = document.getElementById('splash-screen');
+                        if (s && !s.classList.contains('fade-out')) {
+                            s.classList.add('fade-out');
+                            setTimeout(function() { try { s.remove(); } catch(e) {} }, 400);
+                        }
+                    }
+                    var sEl = document.getElementById('splash-screen');
+                    if (sEl) sEl.addEventListener('click', dismissSplash);
+                    setTimeout(dismissSplash, 2200);
+                })();
+            </script>
+
+            <!-- Canvas for Game World -->
+            <canvas id="gameCanvas"></canvas>
+
+            <!-- Top Instrument Telemetry Deck -->
+            <header id="top-hud" class="telemetry-deck">
+                <div class="deck-cluster left">
+                    <div class="deck-item">
+                        <span class="deck-tag" data-i18n="hud_pwr">PWR</span>
+                        <span id="badge-energy" class="deck-val">10</span>
+                        <span class="deck-unit">⚡</span>
+                    </div>
+                    <div id="deck-flow-indicator" class="deck-item flow-item">
+                        <span class="deck-tag" data-i18n="hud_flow">FLOW</span>
+                        <span id="val-mult" class="deck-val">1.00</span>
+                        <span class="deck-unit">✖</span>
+                    </div>
+                </div>
+
+                <div class="deck-cluster center">
+                    <span class="deck-title-mini" data-i18n="hud_center">POLYGON // SECTOR-01</span>
+                </div>
+
+                <div class="deck-cluster right">
+                    <div id="vip-hud-badge" class="vip-hud-pill hidden" title="VIP Status Active">★ VIP</div>
+                    <div class="deck-item">
+                        <span class="deck-tag">CRED</span>
+                        <span id="val-money" class="deck-val">0</span>
+                    </div>
+                    <div class="deck-item">
+                        <span class="deck-tag" data-i18n="hud_cryst">CRYST</span>
+                        <span id="val-rubies" class="deck-val">1</span>
+                        <span class="deck-unit">💎</span>
+                    </div>
+                    <button type="button" id="btn-toggle-fullscreen" class="deck-btn-sound" title="Fullscreen" onclick="if(window.game) window.game.toggleFullscreen();">⛶</button>
+                    <button type="button" id="btn-open-settings" class="deck-btn-sound" title="Settings">⚙</button>
+                </div>
+            </header>
+
+            <!-- Upper Sky On-Screen Tap Prompter & Charging Dashboard -->
+            <div id="tap-prompt-area" class="tap-prompt-area">
+                <!-- Idle State Prompter -->
+                <div id="prompt-idle" class="prompt-card idle-pulse">
+                    <div class="prompt-line-top">
+                        <span class="prompt-icon">⚡</span>
+                        <span class="prompt-title" data-i18n="prompt_title">TAP THE SCREEN</span>
+                    </div>
+                    <div class="prompt-sub" data-i18n="prompt_sub">Fast taps charge power and jump multiplier</div>
+                    <div class="prompt-turbo-wrap">
+                        <button type="button" id="btn-turbo-boost" class="btn-turbo-boost" title="Activate turbo boost for 1 jump" onclick="if(window.game) window.game.toggleTurboBoost();">
+                            <span class="turbo-badge" data-i18n="turbo_badge">⚡ TURBO-START ✖2.50</span>
+                            <span class="turbo-ad-tag" data-i18n="turbo_ad_tag">AD 📺</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Landing Double Reward Callout (Rewarded Ad) -->
+                <div id="landing-double-banner" class="landing-double-banner hidden">
+                    <div class="landing-double-info">
+                        <span class="landing-double-tag" data-i18n="landing_tag">LANDING:</span>
+                        <span id="landing-double-val" class="landing-double-val">+0 CRED</span>
+                    </div>
+                    <button type="button" id="btn-claim-double-reward" class="btn-claim-double" onclick="if(window.game) window.game.claimDoubleReward();">
+                        <span class="double-main-txt" data-i18n="double_main">DOUBLE ✖2</span>
+                        <span class="double-ad-pill" data-i18n="double_ad">AD 📺</span>
+                    </button>
+                </div>
+
+                <!-- Active Charging HUD -->
+                <div id="charge-hud" class="charge-hud hidden">
+                    <div class="charge-timer-container">
+                        <div class="charge-timer-track">
+                            <div id="timer-fill" class="charge-timer-bar"></div>
+                        </div>
+                    </div>
+
+                    <div class="charge-dashboard">
+                        <div class="charge-stat-block">
+                            <span class="charge-stat-tag" data-i18n="charge_mult_label">MULTIPLIER</span>
+                            <span id="val-mult-charge" class="charge-stat-val">✖ 1.00</span>
+                        </div>
+
+                        <div id="decay-badge" class="charge-flow-badge rising">
+                            <span id="decay-icon">▲</span>
+                            <span id="decay-text" data-i18n="charge_rising">CHARGING</span>
+                        </div>
+
+                        <div class="charge-stat-block">
+                            <span class="charge-stat-tag" data-i18n="charge_energy_label">ENERGY</span>
+                            <span id="val-energy-hud" class="charge-stat-val">10 ⚡</span>
+                        </div>
+                    </div>
+
+                    <div class="charge-action-callout">
+                        <span data-i18n="charge_action">🔥 TAP FASTER! 🔥</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Hidden compat elements for safety -->
+            <div class="hidden">
+                <button type="button" id="btn-charge" tabindex="-1" disabled><span class="btn-charge-main">TAP</span><span id="disc-flow-badge"></span></button>
+                <svg><circle id="radial-progress"></circle></svg>
+            </div>
+
+            <!-- In-Flight Altitude Visor -->
+            <div id="altitude-banner" class="hidden alt-visor">
+                <div class="visor-header">
+                    <span class="visor-dot"></span>
+                    <span class="visor-tag" data-i18n="visor_tag">ALTIMETER</span>
+                    <span id="alt-vector" class="visor-vector">▲ 0 m/s</span>
+                </div>
+                <div class="visor-main">
+                    <span id="altitude-text" class="visor-number">0m</span>
+                </div>
+                <!-- In-Flight Telemetry Event Alert Pill -->
+                <div id="visor-event-ticker" class="visor-ticker hidden">
+                    <span id="visor-event-text" class="visor-ticker-text">⚡ INDUCTION BOOST: +15%</span>
+                </div>
+                <div class="visor-footer">
+                    <div class="visor-ladder">
+                        <span class="ladder-mark"></span>
+                        <span class="ladder-mark active"></span>
+                        <span class="ladder-mark"></span>
+                    </div>
+                    <span id="visor-sub-text" class="visor-sub" data-i18n="visor_sub_default">STRATOSPHERE</span>
+                </div>
+            </div>
+
+            <!-- Bottom Modular Dock -->
+            <nav id="bottom-nav" class="modular-dock">
+                <div class="dock-grid dock-grid-4">
+                    <button type="button" id="btn-open-upgrades" class="dock-tab-btn" onclick="if(window.game) window.game.openModal('upgrades');">
+                        <span class="dock-tab-label" data-i18n="nav_upgrades">UPGRADES</span>
+                        <span class="dock-tab-code">[M-01]</span>
+                    </button>
+                    <button type="button" id="btn-open-pets" class="dock-tab-btn" onclick="if(window.game) window.game.openModal('pets');">
+                        <span class="dock-tab-label" data-i18n="nav_drones">DRONES</span>
+                        <span class="dock-tab-code">[D-02]</span>
+                    </button>
+                    <button type="button" id="btn-open-skins" class="dock-tab-btn" onclick="if(window.game) window.game.openModal('skins');">
+                        <span class="dock-tab-label" data-i18n="nav_skins">SKINS</span>
+                        <span class="dock-tab-code">[S-03]</span>
+                    </button>
+                    <button type="button" id="btn-open-stats" class="dock-tab-btn" onclick="if(window.game) window.game.openModal('stats');">
+                        <span class="dock-tab-label" data-i18n="nav_records">RECORDS</span>
+                        <span class="dock-tab-code">[H-04]</span>
+                    </button>
+                </div>
+                <div id="btn-open-rebirth" class="dock-reboot-track" title="Rebirth" onclick="if(window.game) window.game.openModal('rebirth');">
+                    <div id="rebirth-fill" class="dock-reboot-fill"></div>
+                    <div class="dock-reboot-text">
+                        <span class="reboot-tag" data-i18n="nav_rebirth">REBIRTH</span>
+                        <span class="reboot-val"><span id="rebirth-text">0 / 3000</span> CRED</span>
+                    </div>
+                </div>
+            </nav>
+
+        <!-- UPGRADES MODAL -->
+        <div id="modal-upgrades" class="modal-overlay hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <div class="modal-title-group">
+                        <span class="modal-code" data-i18n="upgrades_code">CHARACTER UPGRADES</span>
+                        <span class="modal-title" data-i18n="upgrades_title">UPGRADES</span>
+                    </div>
+                    <button type="button" class="btn-close-modal" data-modal="modal-upgrades">✕</button>
+                </div>
+                <div class="modal-body">
+                    <div class="upgrade-card">
+                        <div class="upgrade-card-header">
+                            <div class="upgrade-name" data-i18n="upg_power_name">JUMP POWER</div>
+                            <div class="upgrade-desc" data-i18n="upg_power_desc">Base launch force per tap</div>
+                        </div>
+                        <div class="upgrade-details">
+                            <div class="upgrade-stat-badge">
+                                <span class="stat-prefix" data-i18n="upg_power_prefix">POWER:</span>
+                                <span id="upgrade-power-lvl">10</span> ⚡
+                            </div>
+                            <button type="button" id="btn-buy-power" class="btn-buy-upgrade">
+                                <span data-i18n="btn_upgrade">UPGRADE</span>
+                                <span class="cost-pill"><span id="upgrade-power-cost">168</span> CRED</span>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="upgrade-card">
+                        <div class="upgrade-card-header">
+                            <div class="upgrade-name" data-i18n="upg_speed_name">BOOST TIME</div>
+                            <div class="upgrade-desc" data-i18n="upg_speed_desc">Tap duration and multiplier growth per tap</div>
+                        </div>
+                        <div class="upgrade-details">
+                            <div class="upgrade-stat-badge">
+                                <span class="stat-prefix" data-i18n="upg_speed_prefix">TIME:</span>
+                                <span id="upgrade-speed-lvl">4.0s</span> ⏳
+                            </div>
+                            <button type="button" id="btn-buy-speed" class="btn-buy-upgrade" onclick="if(window.game) window.game.buyUpgrade('speed');">
+                                <span data-i18n="btn_upgrade">UPGRADE</span>
+                                <span class="cost-pill"><span id="upgrade-speed-cost">400</span> CRED</span>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="upgrade-card">
+                        <div class="upgrade-card-header">
+                            <div class="upgrade-name" data-i18n="upg_aero_name">AERODYNAMICS</div>
+                            <div class="upgrade-desc" data-i18n="upg_aero_desc">Reduces air drag (+8% height per level)</div>
+                        </div>
+                        <div class="upgrade-details">
+                            <div class="upgrade-stat-badge">
+                                <span class="stat-prefix" data-i18n="upg_aero_prefix">FAIRING:</span>
+                                <span id="upgrade-aero-lvl">+0%</span> 🪽
+                            </div>
+                            <button type="button" id="btn-buy-aero" class="btn-buy-upgrade" onclick="if(window.game) window.game.buyUpgrade('aero');">
+                                <span data-i18n="btn_upgrade">UPGRADE</span>
+                                <span class="cost-pill"><span id="upgrade-aero-cost">600</span> CRED</span>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="upgrade-card">
+                        <div class="upgrade-card-header">
+                            <div class="upgrade-name" data-i18n="upg_crit_name">CRITICAL TAP</div>
+                            <div class="upgrade-desc" data-i18n="upg_crit_desc">Chance to land a critical pulse (+0.25x per tap)</div>
+                        </div>
+                        <div class="upgrade-details">
+                            <div class="upgrade-stat-badge">
+                                <span class="stat-prefix" data-i18n="upg_crit_prefix">CRIT CHANCE:</span>
+                                <span id="upgrade-crit-lvl">8%</span> ⚡
+                            </div>
+                            <button type="button" id="btn-buy-crit" class="btn-buy-upgrade" onclick="if(window.game) window.game.buyUpgrade('crit');">
+                                <span data-i18n="btn_upgrade">UPGRADE</span>
+                                <span class="cost-pill"><span id="upgrade-crit-cost">1200</span> CRED</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- PETS / DRONES MODAL -->
+        <div id="modal-pets" class="modal-overlay hidden">
+            <div class="modal-content pets-modal-content">
+                <div class="modal-header">
+                    <div class="modal-title-group">
+                        <span class="modal-code" data-i18n="pets_code">COMPANIONS &amp; HELPERS</span>
+                        <span class="modal-title" data-i18n="pets_title">DRONES IN FLIGHT</span>
+                    </div>
+                    <button type="button" class="btn-close-modal" data-modal="modal-pets">✕</button>
+                </div>
+
+                <!-- Modular Navigation Tabs -->
+                <div class="pets-subnav">
+                    <button type="button" class="pets-subnav-btn active" data-pettab="hangar">
+                        <span class="p-tab-icon">🛰️</span>
+                        <span class="p-tab-label" data-i18n="pet_tab_hangar">HANGAR</span>
+                        <span id="pet-hangar-count" class="p-tab-count">(0)</span>
+                    </button>
+                    <button type="button" class="pets-subnav-btn" data-pettab="scanner">
+                        <span class="p-tab-icon">✦</span>
+                        <span class="p-tab-label" data-i18n="pet_tab_scanner">SCAN</span>
+                    </button>
+                    <button type="button" class="pets-subnav-btn" data-pettab="fusion">
+                        <span class="p-tab-icon">⚡</span>
+                        <span class="p-tab-label" data-i18n="pet_tab_fusion">FUSION</span>
+                        <span id="pet-fusion-alert" class="fusion-alert-pill hidden">!</span>
+                    </button>
+                </div>
+
+                <div class="modal-body pets-container">
+                    <!-- TAB 1: HANGAR & DRONES -->
+                    <div id="pet-tab-hangar" class="pet-tab-panel">
+                        <div class="pets-filter-bar">
+                            <span class="pets-filter-title" data-i18n="pet_hangar_label">DRONES IN HANGAR</span>
+                            <div class="pets-filter-actions">
+                                <button type="button" id="btn-sort-pets" class="btn-sort-toggle" title="Sort order">
+                                    <span class="sort-icon">⬍</span>
+                                    <span id="sort-pets-label" data-i18n="pet_sort_rarity">RARITY ▼</span>
+                                </button>
+                                <button type="button" class="btn-quick-find-pet" onclick="if(window.game) window.game.switchPetTab('scanner');">
+                                    <span data-i18n="btn_find">+ FIND</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div id="pets-grid" class="pets-grid">
+                            <!-- Populated dynamically via JS -->
+                        </div>
+
+                        <!-- Selected Pet Details & Actions -->
+                        <div id="selected-pet-details" class="selected-pet-panel">
+                            <div class="sel-pet-info-box">
+                                <div id="sel-pet-icon" class="sel-pet-icon-big">⬡</div>
+                                <div class="sel-pet-stats-text">
+                                    <div class="sel-pet-name-row">
+                                        <span id="sel-pet-name">Hexagon</span>
+                                        <span id="sel-pet-rarity-badge" class="pet-rarity-badge badge-common">Common</span>
+                                        <span id="sel-pet-lvl" class="pet-lvl-tag">LVL. 1</span>
+                                    </div>
+                                    <div class="sel-pet-specs">
+                                        <span id="sel-pet-mult" class="spec-highlight">✖ 1.0 to coins</span>
+                                        <span class="specs-sep">•</span>
+                                        <span id="sel-pet-energy" class="spec-highlight">+2 to thrust ⚡</span>
+                                    </div>
+                                    <div id="sel-pet-desc" class="sel-pet-desc">Basic drone. Provides initial jump thrust.</div>
+                                </div>
+                            </div>
+                            <div class="sel-pet-actions">
+                                <button type="button" id="btn-pet-equip" class="btn-pet-action action-equip">EQUIP</button>
+                                <button type="button" id="btn-pet-upgrade" class="btn-pet-action action-upgrade">
+                                    ⬆ UPGRADE (<span id="sel-pet-upg-cost">400</span> 💵)
+                                </button>
+                                <button type="button" id="btn-pet-delete" class="btn-pet-action action-delete" title="Delete module">🗑</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TAB 2: DRONE SCANNER / GACHA -->
+                    <div id="pet-tab-scanner" class="pet-tab-panel hidden">
+                        <div class="scanner-deck-card">
+                            <div class="scanner-hero">
+                                <div class="scanner-radar-glyph">✦</div>
+                                <div class="scanner-hero-title" data-i18n="scanner_hero_title">ORBITAL SCANNER</div>
+                                <div class="scanner-hero-sub" data-i18n="scanner_hero_sub">Scan deep space to discover new companions</div>
+                            </div>
+
+                            <div class="scanner-buttons-row">
+                                <button type="button" id="btn-unbox-pet" class="btn-unbox-gift btn-scanner-action">
+                                    <span class="unbox-btn-label" data-i18n="btn_scan_crystals">EXPLORE SECTOR</span>
+                                    <span class="unbox-btn-cost" data-i18n="scan_crystals_cost">2 CRYSTALS 💎</span>
+                                </button>
+                                <button type="button" id="btn-unbox-ad" class="btn-unbox-ad btn-scanner-action">
+                                    <span class="unbox-ad-main" data-i18n="btn_scan_free">SCAN FREE 📺</span>
+                                    <span id="unbox-ad-status" class="unbox-ad-sub" data-i18n="scan_free_label">FREE</span>
+                                </button>
+                            </div>
+
+                            <div class="scanner-chances-card">
+                                <div class="chances-header" data-i18n="scanner_chances_title">MODULE DISCOVERY RATES:</div>
+                                <div class="chances-list">
+                                    <div class="chance-pill tier-common">
+                                        <span class="dot-rarity dot-common"></span>
+                                        <span class="c-tier-name" data-i18n="chance_common">Common (Hexagon)</span>
+                                        <span class="c-tier-pct">45%</span>
+                                    </div>
+                                    <div class="chance-pill tier-rare">
+                                        <span class="dot-rarity dot-rare"></span>
+                                        <span class="c-tier-name" data-i18n="chance_rare">Rare (Rhombus)</span>
+                                        <span class="c-tier-pct">30%</span>
+                                    </div>
+                                    <div class="chance-pill tier-epic">
+                                        <span class="dot-rarity dot-epic"></span>
+                                        <span class="c-tier-name" data-i18n="chance_epic">Epic (Quasar)</span>
+                                        <span class="c-tier-pct">15%</span>
+                                    </div>
+                                    <div class="chance-pill tier-legendary">
+                                        <span class="dot-rarity dot-legendary"></span>
+                                        <span class="c-tier-name" data-i18n="chance_legendary">Legendary (Sphere)</span>
+                                        <span class="c-tier-pct">7%</span>
+                                    </div>
+                                    <div class="chance-pill tier-mythic">
+                                        <span class="dot-rarity dot-mythic"></span>
+                                        <span class="c-tier-name" data-i18n="chance_mythic">Mythic (Singular)</span>
+                                        <span class="c-tier-pct">3%</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TAB 3: QUANTUM FUSION -->
+                    <div id="pet-tab-fusion" class="pet-tab-panel hidden">
+                        <div class="drone-fusion-card">
+                            <div class="fusion-header">
+                                <span class="fusion-tag" data-i18n="fusion_tag">QUANTUM FUSION</span>
+                                <span class="fusion-sub" data-i18n="fusion_sub">COMBINE 3 DUPLICATES INTO A RARER TIER</span>
+                            </div>
+                            <div class="fusion-body">
+                                <div id="fusion-status-text" class="fusion-status" data-i18n="fusion_select">SELECT TIER FOR FUSION</div>
+                                <div class="fusion-actions">
+                                    <button type="button" id="btn-fuse-drones" class="btn-fuse-action" disabled onclick="if(window.game) window.game.performDroneFusion();">
+                                        <span data-i18n="btn_fuse">FUSE (3 ➔ 1)</span>
+                                    </button>
+                                    <button type="button" id="btn-fuse-boost-ad" class="btn-fuse-ad" onclick="if(window.game) window.game.boostFusionWithAd();">
+                                        <span id="fuse-ad-tag" data-i18n="fuse_ad">⚡ +25% BOOST FOR 📺</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="fusion-matrix-info">
+                                <div class="matrix-title" data-i18n="matrix_title">FUSION MATRIX:</div>
+                                <div class="matrix-row">
+                                    <span data-i18n="tier_common">3 Commons</span> ➔ <span class="m-pill badge-rare" data-i18n="tier_rare_to">Rare</span> <span class="matrix-pct">85%</span>
+                                </div>
+                                <div class="matrix-row">
+                                    <span data-i18n="tier_rare_from">3 Rares</span> ➔ <span class="m-pill badge-epic" data-i18n="tier_epic_to">Epic</span> <span class="matrix-pct">65%</span>
+                                </div>
+                                <div class="matrix-row">
+                                    <span data-i18n="tier_epic_from">3 Epics</span> ➔ <span class="m-pill badge-legendary" data-i18n="tier_legendary_to">Legendary</span> <span class="matrix-pct">45%</span>
+                                </div>
+                                <div class="matrix-row">
+                                    <span data-i18n="tier_legendary_from">3 Legendaries</span> ➔ <span class="m-pill badge-mythic" data-i18n="tier_mythic_to">Mythic</span> <span class="matrix-pct">25%</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- REBIRTH MODAL -->
+        <div id="modal-rebirth" class="modal-overlay hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <div class="modal-title-group">
+                        <span class="modal-code" data-i18n="rebirth_code">CYCLE RESTART</span>
+                        <span class="modal-title" data-i18n="rebirth_title">REBIRTH</span>
+                    </div>
+                    <button type="button" class="btn-close-modal" data-modal="modal-rebirth">✕</button>
+                </div>
+                <div class="modal-body rebirth-content-box">
+                    <p class="rebirth-desc" data-i18n="rebirth_desc">Resets coins and base upgrades, but permanently increases all future income by +100%, grants rare CRYSTALS 💎 and saves all your drones!</p>
+                    <div class="rebirth-stat-table">
+                        <div class="rebirth-stat-row">
+                            <span class="stat-label" data-i18n="rebirth_cur_bonus">CURRENT BONUS:</span>
+                            <span id="rebirth-current-bonus" class="stat-value">+0%</span>
+                        </div>
+                        <div class="rebirth-stat-row highlight">
+                            <span class="stat-label" data-i18n="rebirth_next_bonus">AFTER REBIRTH:</span>
+                            <span id="rebirth-next-bonus" class="stat-value">+100% &amp; +2 💎</span>
+                        </div>
+                        <div class="rebirth-stat-row">
+                            <span class="stat-label" data-i18n="rebirth_need_coins">COINS NEEDED:</span>
+                            <span id="rebirth-req-text" class="stat-value">0 / 8000 CRED</span>
+                        </div>
+                    </div>
+                    <button type="button" id="btn-confirm-rebirth" class="btn-rebirth-confirm" disabled data-i18n="btn_rebirth">
+                        PERFORM REBIRTH
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- SKINS / WARDROBE MODAL -->
+        <div id="modal-skins" class="modal-overlay hidden">
+            <div class="modal-content skins-modal-content">
+                <div class="modal-header">
+                    <div class="modal-title-group">
+                        <span class="modal-code" data-i18n="skins_code">PILOT WARDROBE</span>
+                        <span class="modal-title" data-i18n="skins_title">SUITS &amp; GEAR</span>
+                    </div>
+                    <button type="button" class="btn-close-modal" data-modal="modal-skins">✕</button>
+                </div>
+                <div class="modal-body skins-body">
+                    <!-- Grid of all available suits -->
+                    <div class="skins-grid" id="skins-grid">
+                        <!-- Dynamically populated in game.js -->
+                    </div>
+
+                    <!-- Selected Skin Inspection Card -->
+                    <div class="skin-details-card" id="selected-skin-details">
+                        <div class="skin-card-left">
+                            <div class="skin-preview-canvas-wrap">
+                                <canvas id="skinPreviewCanvas" width="130" height="130"></canvas>
+                            </div>
+                        </div>
+                        <div class="skin-card-right">
+                            <div class="skin-top-meta">
+                                <span id="sel-skin-badge" class="skin-badge-status">EQUIPPED</span>
+                                <span id="sel-skin-title" class="skin-badge-title">BASIC SUIT</span>
+                            </div>
+                            <div id="sel-skin-name" class="skin-name-heading">Polygon Runner</div>
+                            <div id="sel-skin-desc" class="skin-desc-text">Classic tactical suit with a long flowing scarf and white tactical visor.</div>
+                            <div class="skin-perk-box">
+                                <span class="perk-label" data-i18n="skin_perk_label">EFFECT:</span>
+                                <span id="sel-skin-perk" class="perk-val">Standard gear</span>
+                            </div>
+                            <div class="skin-unlock-box">
+                                <span class="unlock-label" data-i18n="skin_unlock_label">CONDITION:</span>
+                                <span id="sel-skin-unlock" class="unlock-val">Available immediately</span>
+                            </div>
+                            <div class="skin-actions-row">
+                                <button type="button" id="btn-skin-equip" class="btn-skin-action action-equip" data-i18n="btn_skin_equip">EQUIP SUIT</button>
+                                <button type="button" id="btn-skin-buy" class="btn-skin-action action-buy hidden" data-i18n="btn_skin_buy">BUY FOR 💎</button>
+                                <button type="button" id="btn-skin-ad" class="btn-skin-action action-ad hidden" data-i18n="btn_skin_unlock_ad">UNLOCK FOR 📺</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- QUANTUM SCANNER MODAL (FOR UNBOXING WITH CORE) -->
+        <div id="modal-scanner" class="modal-overlay hidden scanner-modal-overlay">
+            <div class="scanner-device-frame">
+                <!-- Top Telemetry Status -->
+                <div class="scanner-hud-header">
+                    <div class="scanner-hud-status">
+                        <span class="scanner-live-dot"></span>
+                        <span id="scanner-status-text" data-i18n="scanner_status_searching">SEARCHING SIGNAL...</span>
+                    </div>
+                    <div class="scanner-hud-right">
+                        <div class="scanner-hud-freq">
+                            FREQ: <span id="scanner-freq-val">142.85</span> MHz
+                        </div>
+                        <button type="button" id="btn-close-scanner" class="btn-close-scanner" title="Close">✕</button>
+                    </div>
+                </div>
+
+                <!-- Radar Viewfinder -->
+                <div class="scanner-viewfinder">
+                    <!-- Background Radar Grid & Coordinates -->
+                    <div class="scanner-grid-bg"></div>
+                    <div class="scanner-reticle reticle-tl"></div>
+                    <div class="scanner-reticle reticle-tr"></div>
+                    <div class="scanner-reticle reticle-bl"></div>
+                    <div class="scanner-reticle reticle-br"></div>
+                    <div class="scanner-crosshair-center"></div>
+
+                    <!-- Animated Moving Laser Line -->
+                    <div id="scanner-laser" class="scanner-laser-beam"></div>
+
+                    <!-- Search / Cipher State -->
+                    <div id="scanner-active-search" class="scanner-active-search">
+                        <div class="scanner-cipher-wrap">
+                            <div id="scanner-glyph-cipher" class="scanner-glyph-cipher">⬡</div>
+                        </div>
+                        <div class="scanner-search-subtitle">
+                            <span id="scanner-telemetry-text" data-i18n="scanner_telemetry_2">&gt; SEARCHING SIGNAL...</span>
+                            <div class="scanner-progress-bar-wrap">
+                                <div id="scanner-progress-bar" class="scanner-progress-bar"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Signal Locked / Reveal Card State -->
+                    <div id="scanner-reveal-card" class="scanner-reveal-card hidden">
+                        <div id="scanner-reveal-badge" class="scanner-rarity-banner badge-legendary">★ LEGENDARY DRONE ★</div>
+                        <div class="scanner-reveal-icon-wrap">
+                            <div id="scanner-reveal-icon" class="scanner-reveal-icon">◉</div>
+                        </div>
+                        <div id="scanner-reveal-name" class="scanner-reveal-name">Sphere</div>
+                        <div class="scanner-reveal-stats">
+                            <span id="scanner-reveal-mult" class="pet-chip chip-money">✖ 2.5 💵 to coins</span>
+                            <span id="scanner-reveal-energy" class="pet-chip chip-power">+25 ⚡ to thrust</span>
+                        </div>
+                        <div id="scanner-reveal-desc" class="scanner-reveal-desc">
+                            Legendary drone! Income ✖ 2.5 and super-thrust +25!
+                        </div>
+                        <div class="scanner-reveal-actions">
+                            <button type="button" id="btn-scanner-equip" class="btn-scanner-action action-equip-now" data-i18n="btn_scanner_equip">⚡ EQUIP NOW</button>
+                            <button type="button" id="btn-scanner-stash" class="btn-scanner-action action-to-hangar" data-i18n="btn_scanner_stash">TO HANGAR 📦</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Footer Telemetry -->
+                <div class="scanner-hud-footer">
+                    <span data-i18n="scanner_footer">RADAR: DRONE-SCANNER 01</span>
+                    <span id="scanner-lock-tag" data-i18n="scanner_lock_tag_search">[ SEARCHING ]</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- SETTINGS MODAL -->
+        <div id="modal-settings" class="modal-overlay hidden">
+            <div class="modal-content settings-modal-content">
+                <div class="modal-header">
+                    <div class="modal-title-group">
+                        <span class="modal-code" data-i18n="settings_code">PARAMETERS // SYSTEM</span>
+                        <span class="modal-title" data-i18n="settings_title">SETTINGS</span>
+                    </div>
+                    <button type="button" class="btn-close-modal" data-modal="modal-settings">✕</button>
+                </div>
+                <div class="modal-body settings-body">
+
+                    <!-- Sound Toggle Option -->
+                    <div class="settings-row">
+                        <div class="settings-label-block">
+                            <div class="settings-opt-title" data-i18n="settings_sound_title">SOUND EFFECTS</div>
+                            <div class="settings-opt-sub" data-i18n="settings_sound_sub">Clicks, synthesizer and radar scanner</div>
+                        </div>
+                        <button type="button" id="btn-settings-sound" class="btn-settings-toggle">
+                            <span id="settings-sound-icon">🔊</span>
+                            <span id="settings-sound-text" data-i18n="settings_sound_on">ON</span>
+                        </button>
+                    </div>
+
+                    <!-- Language Switcher -->
+                    <div class="settings-row">
+                        <div class="settings-label-block">
+                            <div class="settings-opt-title" data-i18n="settings_lang_title">LANGUAGE</div>
+                            <div class="settings-opt-sub" data-i18n="settings_lang_sub">Interface language / Язык интерфейса</div>
+                        </div>
+                        <div class="lang-toggle-group" id="lang-toggle-group">
+                            <button type="button" class="btn-lang active" id="btn-lang-en" onclick="window.setLang('en'); if(window.game) window.game.applyLocale();">EN</button>
+                            <button type="button" class="btn-lang" id="btn-lang-ru" onclick="window.setLang('ru'); if(window.game) window.game.applyLocale();">RU</button>
+                        </div>
+                    </div>
+
+                    <!-- Reset Progress Option -->
+                    <div class="settings-row reset-row">
+                        <div class="settings-label-block">
+                            <div class="settings-opt-title text-danger" data-i18n="settings_reset_title">RESET DATA</div>
+                            <div class="settings-opt-sub" data-i18n="settings_reset_sub">Full reset of coins, crystals and drones</div>
+                        </div>
+                        <button type="button" id="btn-settings-reset" class="btn-settings-reset" data-i18n="btn_reset">
+                            RESET ⚠️
+                        </button>
+                    </div>
+
+                    <!-- Safety Confirmation Prompt -->
+                    <div id="reset-confirm-box" class="reset-confirm-box hidden">
+                        <div class="reset-warning-title" data-i18n="reset_confirm_title">⚠️ CONFIRM RESET</div>
+                        <div class="reset-warning-desc" data-i18n="reset_confirm_desc">Are you sure? All coin balance, crystals, records and discovered drones will be permanently deleted.</div>
+                        <div class="reset-confirm-actions">
+                            <button type="button" id="btn-confirm-reset-yes" class="btn-confirm-danger" data-i18n="btn_confirm_yes">YES, DELETE ALL</button>
+                            <button type="button" id="btn-confirm-reset-no" class="btn-confirm-cancel" data-i18n="btn_confirm_no">CANCEL</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- OFFLINE INCOME MODAL -->
+        <div id="modal-offline-income" class="modal-overlay hidden">
+            <div class="modal-content offline-modal-content">
+                <div class="modal-header">
+                    <div class="modal-title-group">
+                        <span class="modal-code" data-i18n="offline_code">ORBITAL TELEMETRY // AUTONOMOUS MODE</span>
+                        <span class="modal-title" data-i18n="offline_title">OFFLINE EARNINGS</span>
+                    </div>
+                    <button type="button" class="btn-close-modal" data-modal="modal-offline-income">✕</button>
+                </div>
+                <div class="modal-body offline-body">
+                    <div class="offline-hero-card">
+                        <div class="offline-radar-icon">🛰️</div>
+                        <div class="offline-time-badge" id="offline-time-text">ABSENCE: 0h 0m</div>
+                        <div class="offline-msg" data-i18n="offline_msg">While you were away, your autonomous modules patrolled the orbit and collected resources:</div>
+                        <div class="offline-amount-box">
+                            <span class="offline-amount-val" id="offline-amount-val">+0</span>
+                            <span class="offline-amount-unit">CRED</span>
+                        </div>
+                    </div>
+                    <div class="offline-actions">
+                        <button type="button" id="btn-claim-offline-x3" class="btn-claim-x3">
+                            <span class="btn-x3-label" data-i18n="btn_triple_label">★ DOUBLE (✖2) AND +1 💎 ★</span>
+                            <span class="btn-x3-ad-pill" data-i18n="btn_triple_ad">AD 📺</span>
+                        </button>
+                        <button type="button" id="btn-claim-offline-reg" class="btn-claim-reg" data-i18n="btn_claim_reg">
+                            CLAIM REGULAR REWARD
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- E-INK MOCK AD OVERLAY (FOR DEV & STANDALONE) -->
+        <div id="mock-ad-modal" class="modal-overlay hidden mock-ad-overlay">
+            <div class="mock-ad-frame">
+                <div class="mock-ad-header">
+                    <div class="mock-ad-header-left">
+                        <span class="mock-ad-live-dot"></span>
+                        <span id="mock-ad-title" data-i18n="mock_ad_title">SPONSOR SIGNAL BROADCAST</span>
+                    </div>
+                    <span id="mock-ad-timer" class="mock-ad-timer">3s</span>
+                </div>
+                <div class="mock-ad-body">
+                    <div class="mock-ad-screen">
+                        <div class="mock-ad-glyph-row">⬡ ◈ ✦ ◉ 🜂</div>
+                        <div class="mock-ad-promo-text" data-i18n="mock_ad_promo">TECH SECTOR // JUMP RANGE</div>
+                        <div class="mock-ad-sub" data-i18n="mock_ad_sub">Your reward will be credited automatically after the broadcast ends.</div>
+                        <div class="mock-ad-bar-wrap">
+                            <div id="mock-ad-progress-fill" class="mock-ad-progress-fill"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="mock-ad-footer">
+                    <button type="button" id="btn-mock-ad-skip" class="btn-mock-ad-skip" data-i18n="btn_mock_skip">SKIP TEST ⏩</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- STATS & HALL OF FAME MODAL -->
+        <div id="modal-stats" class="modal-overlay hidden">
+            <div class="modal-content stats-modal-content">
+                <div class="modal-header">
+                    <div class="modal-title-group">
+                        <span class="modal-code" data-i18n="stats_code">TELEMETRY // ACHIEVEMENTS</span>
+                        <span class="modal-title" data-i18n="stats_title">RECORDS &amp; STATISTICS</span>
+                    </div>
+                    <button type="button" class="btn-close-modal" data-modal="modal-stats">✕</button>
+                </div>
+                <div class="modal-body stats-body">
+                    <!-- Hall of Fame Top 5 -->
+                    <div class="stats-section-title" data-i18n="stats_hof_title">🏆 HALL OF FAME // TOP-5 JUMPS</div>
+                    <div id="hall-of-fame-list" class="hof-list">
+                        <!-- Populated via JS -->
+                    </div>
+
+                    <!-- Career Lifetime Stats -->
+                    <div class="stats-section-title stats-career-title" data-i18n="stats_career_title">📊 CAREER STATISTICS</div>
+                    <div class="career-stats-grid">
+                        <div class="career-stat-card">
+                            <span class="c-stat-label" data-i18n="stat_distance">DISTANCE:</span>
+                            <span id="stat-total-dist" class="c-stat-val">0 km</span>
+                        </div>
+                        <div class="career-stat-card">
+                            <span class="c-stat-label" data-i18n="stat_jumps">JUMPS:</span>
+                            <span id="stat-total-jumps" class="c-stat-val">0</span>
+                        </div>
+                        <div class="career-stat-card">
+                            <span class="c-stat-label" data-i18n="stat_max_mult">MAX MULTIPLIER:</span>
+                            <span id="stat-max-mult" class="c-stat-val">✖ 1.00</span>
+                        </div>
+                        <div class="career-stat-card">
+                            <span class="c-stat-label" data-i18n="stat_drones">DRONES IN HANGAR:</span>
+                            <span id="stat-total-pets" class="c-stat-val">0</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right PC Technical Sidebar (Hotkeys & Tips) -->
+    <aside class="desktop-flank flank-right" aria-label="Controls and Telemetry">
+        <div class="flank-card">
+            <div class="flank-tag" data-i18n="flank_tag_right">[ CONTROLS // PC ]</div>
+            <div class="flank-title" data-i18n="flank_title_right">HOTKEYS</div>
+            <div class="flank-hotkeys">
+                <div class="hotkey-row">
+                    <kbd class="flank-kbd">SPACE</kbd>
+                    <span class="hotkey-desc" data-i18n="hotkey_space">TAP / DIVE</span>
+                </div>
+                <div class="hotkey-row">
+                    <kbd class="flank-kbd">1</kbd>
+                    <span class="hotkey-desc" data-i18n="hotkey_1">UPGRADES</span>
+                </div>
+                <div class="hotkey-row">
+                    <kbd class="flank-kbd">2</kbd>
+                    <span class="hotkey-desc" data-i18n="hotkey_2">DRONES</span>
+                </div>
+                <div class="hotkey-row">
+                    <kbd class="flank-kbd">3</kbd>
+                    <span class="hotkey-desc" data-i18n="hotkey_3">REBIRTH</span>
+                </div>
+                <div class="hotkey-row">
+                    <kbd class="flank-kbd">4</kbd>
+                    <span class="hotkey-desc" data-i18n="hotkey_4">SKINS</span>
+                </div>
+                <div class="hotkey-row">
+                    <kbd class="flank-kbd">5</kbd>
+                    <span class="hotkey-desc" data-i18n="hotkey_5">RECORDS</span>
+                </div>
+                <div class="hotkey-row">
+                    <kbd class="flank-kbd">F</kbd>
+                    <span class="hotkey-desc" data-i18n="hotkey_f">FULLSCREEN</span>
+                </div>
+                <div class="hotkey-row">
+                    <kbd class="flank-kbd">O</kbd>
+                    <span class="hotkey-desc" data-i18n="hotkey_o">SETTINGS</span>
+                </div>
+                <div class="hotkey-row">
+                    <kbd class="flank-kbd">M</kbd>
+                    <span class="hotkey-desc" data-i18n="hotkey_m">SOUND ON/OFF</span>
+                </div>
+                <div class="hotkey-row">
+                    <kbd class="flank-kbd">ESC</kbd>
+                    <span class="hotkey-desc" data-i18n="hotkey_esc">CLOSE WINDOWS</span>
+                </div>
+            </div>
+        </div>
+    </aside>
+</div>
+
+    <!-- Scripts -->
+    <script src="audio.js?v=20261002_IAP"></script>
+    <script src="sprites.js?v=20261002_IAP"></script>
+    <script src="platform.js?v=20261002_IAP"></script>
+    <script src="game.js?v=20261002_IAP"></script>
+</body>
+</html>
